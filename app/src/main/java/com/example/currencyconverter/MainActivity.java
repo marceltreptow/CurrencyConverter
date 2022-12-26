@@ -5,10 +5,15 @@ import androidx.appcompat.widget.ShareActionProvider;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.view.MenuItemCompat;
 
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
+import android.provider.BaseColumns;
+import android.text.Editable;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -30,7 +35,7 @@ public class MainActivity extends AppCompatActivity {
     private Spinner spinner2;
     private Button calculatebutton;
     private TextView valueout;
-    private EditText valuein;
+    private TextView valuein;
     private ExchangeRateDatabase exchangeRateDatabase = new ExchangeRateDatabase();
     private Toolbar toolbar;
     private MenuItem item1;
@@ -41,6 +46,22 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        OmdbDbHelper dbHelper = new OmdbDbHelper(this);
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        String[] projection = {
+                BaseColumns._ID,
+                OmdbDbHelper.OMDB_COL_NAME,
+                OmdbDbHelper.OMDB_COL_RATE
+        };
+        Cursor c = db.query(OmdbDbHelper.OMDB_TABLE, projection, null, null,
+                null, null, null);
+        while (c.moveToNext()) {
+            try {
+                exchangeRateDatabase.setExchangeRate(c.getString(c.getColumnIndexOrThrow(OmdbDbHelper.OMDB_COL_NAME)), Double.parseDouble(c.getString(c.getColumnIndexOrThrow(OmdbDbHelper.OMDB_COL_RATE))));
+            }catch (Exception e) {
+                System.out.println(e.getCause());
+            }
+        }
         setContentView(R.layout.activity_main);
         spinner1 = findViewById(R.id.spinner);
         //ArrayAdapter<String> adapter1 = new ArrayAdapter<>(this,R.layout.layout_textview,R.id.my_text_view,list);
@@ -53,23 +74,10 @@ public class MainActivity extends AppCompatActivity {
         valuein = findViewById(R.id.valuein);
         prefs = getPreferences(Context.MODE_PRIVATE);
 
-        /*toolbar.setOnMenuItemClickListener(new Toolbar.OnMenuItemClickListener(){
-            @Override
-            public boolean onMenuItemClick(MenuItem item) {
-                switch (item.getItemId()) {
-                    case R.id.item1:
-                        startActivity(new Intent(MainActivity.this, CurrencyListActivity.class));
-                        break;
-                }
-                return true;
-            }
-        });
-
-         */
 
     }
 
-    /*@Override
+    @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.my_menu, menu);
         item1 = findViewById(R.id.item1);
@@ -103,7 +111,12 @@ public class MainActivity extends AppCompatActivity {
 
     public void onClick(View view){
         if(view.getId() == R.id.calculatebutton) {
-            double value = exchangeRateDatabase.convert(Double.parseDouble(valuein.getText().toString()),spinner1.getSelectedItem().toString().substring(0,3),(String) spinner2.getSelectedItem().toString().substring(0,3));
+            double value = 0.0;
+            try {
+                value = exchangeRateDatabase.convert(Double.parseDouble(valuein.getText().toString()), spinner1.getSelectedItem().toString().substring(0, 3), (String) spinner2.getSelectedItem().toString().substring(0, 3));
+            }catch (Exception e){
+                System.out.println(e.getCause());
+            }
             valueout.setText(""+value);
             setShareText(""+value);
 
@@ -111,26 +124,31 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void updateCurrencies() {
+        OmdbDbHelper dbHelper = new OmdbDbHelper(this);
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        db.delete(OmdbDbHelper.OMDB_TABLE,null,null);
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
                     URL u = new URL("https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml");
                     URLConnection urlConnection = u.openConnection();
-
                     XmlPullParser parser = XmlPullParserFactory.newInstance().newPullParser();
                     parser.setInput(urlConnection.getInputStream(), urlConnection.getContentEncoding());
 
                     int eventType = parser.getEventType();
-                    int i = 0;
 
                     while(eventType != XmlPullParser.END_DOCUMENT){
                         if(eventType == XmlPullParser.START_TAG){
                             if("Cube".equals(parser.getName())){
                                 String currency = parser.getAttributeValue(null,"currency");
-                                if(currency != null)
+                                if(currency != null) {
                                     exchangeRateDatabase.setExchangeRate(currency, Double.parseDouble(parser.getAttributeValue(null, "rate")));
-
+                                    ContentValues values = new ContentValues();
+                                    values.put(OmdbDbHelper.OMDB_COL_NAME, currency);
+                                    values.put(OmdbDbHelper.OMDB_COL_RATE, (parser.getAttributeValue(null, "rate")));
+                                    db.insert(OmdbDbHelper.OMDB_TABLE, null, values);
+                                }
                             }
                         }
                         eventType = parser.next();
@@ -142,18 +160,31 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         thread.start();
-
-    }*/
+        /*OmdbDbHelper dbHelper = new OmdbDbHelper(this);
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(OmdbDbHelper.OMDB_COL_NAME, "AUD");
+        values.put(OmdbDbHelper.OMDB_COL_RATE, "187");
+        long newRowId = db.insert(OmdbDbHelper.OMDB_TABLE, null, values);
+         */
+        /*OmdbDbHelper dbHelper = new OmdbDbHelper(this);
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(OmdbDbHelper.OMDB_COL_RATE, "42");
+        String selection = BaseColumns._ID + " = ?";
+        String[] selectionArgs = { "1" };
+        db.update(OmdbDbHelper.OMDB_TABLE, values, selection, selectionArgs);
+         */
+    }
 
     @Override
     protected void onPause() {
         super.onPause();
         SharedPreferences.Editor editor = prefs.edit();
-        //editor.putFloat("savein", Float.valueOf(String.valueOf(valuein.getText())));
-        //editor.putString("saveout",valueout.getText().toString());
-        editor.putString("saveout","hallo");
-        //editor.putString("currencyin",(String)spinner1.getSelectedItem());
-        //editor.putInt("currencyout",spinner2.getId());
+        editor.putFloat("savein",Float.valueOf(valuein.getText().toString()));
+        editor.putString("saveout",valueout.getText().toString());
+        editor.putString("currencyin",spinner1.getSelectedItem().toString());
+        editor.putString("currencyout",spinner2.getSelectedItem().toString());
         editor.apply();
 
     }
@@ -163,20 +194,14 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume(){
         super.onResume();
-        for (int i = 0; i < 100; i++)
-            System.out.println("onResume");
-        //valuein.setText(Float.toString(prefs.getFloat("savein",0)));
-        String saveout = prefs.getString("saveout","");
-        System.out.println("saveout = " + saveout);
-        valueout.setText(saveout);
-        //Arrays.asList(exchangeRateDatabase.getCurrencies()).indexOf((prefs.getString("currencyin","").substring(0,3))
-        //spinner1.setSelection(Arrays.asList(exchangeRateDatabase.getCurrencies()).indexOf((prefs.getString("currencyin","").substring(0,3))));
-        //spinner2.setSelection(prefs.getInt("currencyout",0));
-        /*SharedPreferences prefs2 = getPreferences(Context.MODE_PRIVATE);
-        String from = prefs2.getString("from", "");
-        if (!from.equals("")) {
-            valueout.setText(from);
-        } else
-            valueout.setText("Malte der Huan");*/
+        String valueinstring = Float.toString(prefs.getFloat("savein",0));
+        if(valueinstring.equals(""))
+            valuein.setText("0.0");
+        else
+            valuein.setText(valueinstring);
+        valueout.setText(prefs.getString("saveout",""));
+        spinner1.setSelection(Arrays.asList(exchangeRateDatabase.getCurrencies()).indexOf((prefs.getString("currencyin","").substring(0,3))));
+        spinner2.setSelection(Arrays.asList(exchangeRateDatabase.getCurrencies()).indexOf((prefs.getString("currencyout","").substring(0,3))));
+
     }
 }
