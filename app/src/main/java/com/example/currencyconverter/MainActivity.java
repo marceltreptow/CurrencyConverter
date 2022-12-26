@@ -74,7 +74,6 @@ public class MainActivity extends AppCompatActivity {
         valuein = findViewById(R.id.valuein);
         prefs = getPreferences(Context.MODE_PRIVATE);
 
-
     }
 
     @Override
@@ -194,14 +193,17 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume(){
         super.onResume();
-        String valueinstring = Float.toString(prefs.getFloat("savein",0));
-        if(valueinstring.equals(""))
-            valuein.setText("0.0");
-        else
-            valuein.setText(valueinstring);
-        valueout.setText(prefs.getString("saveout",""));
-        spinner1.setSelection(Arrays.asList(exchangeRateDatabase.getCurrencies()).indexOf((prefs.getString("currencyin","").substring(0,3))));
-        spinner2.setSelection(Arrays.asList(exchangeRateDatabase.getCurrencies()).indexOf((prefs.getString("currencyout","").substring(0,3))));
-
+        try {
+            String valueinstring = Float.toString(prefs.getFloat("savein", 0));
+            if (valueinstring.equals(""))
+                valuein.setText("0.0");
+            else
+                valuein.setText(valueinstring);
+            valueout.setText(prefs.getString("saveout", ""));
+            spinner1.setSelection(Arrays.asList(exchangeRateDatabase.getCurrencies()).indexOf((prefs.getString("currencyin", "").substring(0, 3))));
+            spinner2.setSelection(Arrays.asList(exchangeRateDatabase.getCurrencies()).indexOf((prefs.getString("currencyout", "").substring(0, 3))));
+        }catch (Exception e){
+            System.out.println(e.getCause());
+        }
     }
 }
